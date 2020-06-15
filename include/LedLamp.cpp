@@ -5,6 +5,7 @@
 #include <Debug.cpp>
 #include <Adafruit_NeoPixel.h>
 #include <PaletteProvider.cpp>
+#include <StopWatch.cpp>
 
 class LedLamp
 {
@@ -12,10 +13,21 @@ private:
     Debug _debug;
     Adafruit_NeoPixel _strip;
     PaletteProvider _paletteProvider;
-    int _leds;
-    int _lastPercentage = 0;
-    int _lastMaxPulse = 0;
-    long _frames = 0;
+    StopWatch _pulseStopWatch;
+    StopWatch _maxPulseStopWatch;
+
+    const unsigned long MAX_PULSE_DECREASE_TIME = 250;
+
+    unsigned int _leds;
+    unsigned int _pulse = 0;
+    unsigned int _maxPulse = 0;
+    unsigned int _lastPulse = 0;
+    bool _animatingPulse = false;
+    unsigned int _animPulse = 0;
+    unsigned int _fromPulse = 0;
+    unsigned int _toPulse = 0;
+
+    unsigned long _maxPulseDecreaseTime = 500;
 
     uint32_t getColor(int led)
     {
@@ -25,8 +37,14 @@ private:
         return color;
     }
 
+    void setMaxPulse(unsigned int maxPulse)
+    {
+        _maxPulse = maxPulse;
+        _maxPulseDecreaseTime = MAX_PULSE_DECREASE_TIME;
+    }
+
 public:
-    LedLamp(int leds) : _debug("LedLamp"), _strip(leds, 3, NEO_GRB + NEO_KHZ800), _paletteProvider(_leds)
+    LedLamp(unsigned int leds) : _debug("LedLamp"), _strip(leds, 3, NEO_GRB + NEO_KHZ800), _paletteProvider(_leds), _pulseStopWatch(), _maxPulseStopWatch()
     {
         _leds = leds;
     };
@@ -37,49 +55,107 @@ public:
         _strip.show();
     }
 
-    void setBrightness(int brightness)
+    void setBrightness(unsigned int brightness)
     {
         _strip.setBrightness(brightness);
     }
 
-    void setPulse(int percentage)
+    void setPulse(unsigned int percentage)
     {
-        int pulse = _leds * percentage / 100;
-
-        if (_frames % 2 != 0 && _lastPercentage >= percentage)
+        if (percentage > 100)
         {
-            _lastPercentage--;
-            return;
+            percentage = 100;
         }
 
-        if (_frames % 12 == 0 && _lastMaxPulse > 0 && _lastMaxPulse > pulse)
+        if (!_animatingPulse)
         {
-            _lastMaxPulse--;
+            _pulse = _leds * percentage / 100;
+            //_debug.println("_pulse: ", String(_pulse));
         }
+
+        updatePulse();
+        updateMaxPulse(_pulse);
 
         _strip.clear();
-        if (pulse > 0)
-        {
-            for (int i = 0; i <= pulse; i++)
-            {
-                _strip.setPixelColor(i, getColor(i));
-            }
-        }
-
-        if (_lastMaxPulse <= pulse && pulse < _leds)
-        {
-            _lastMaxPulse = pulse;
-        }
-
-        _strip.setPixelColor(_lastMaxPulse, _strip.Color(255, 255, 255));
+        renderPulse(_pulse);
+        renderMaxPulse(_maxPulse);
         _strip.show();
 
-        _lastPercentage = percentage;
+        _lastPulse = _pulse;
+    }
 
-        _frames++;
-        if (_frames > 65000)
+    void renderPulse(unsigned int pulse)
+    {
+        for (unsigned int i = 0; i < pulse; i++)
         {
-            _frames = 0;
+            _strip.setPixelColor(i, getColor(i));
+        }
+    }
+
+    void renderMaxPulse(unsigned int maxPulse)
+    {
+        _strip.setPixelColor(maxPulse - 1, _strip.Color(255, 255, 255));
+    }
+
+    unsigned int decreasePulseFactor = 0;
+    void updatePulse()
+    {
+        if (!_animatingPulse && _pulse < _lastPulse)
+        {
+            _toPulse = _pulse;
+            _fromPulse = _lastPulse;
+            _animPulse = _fromPulse;
+            _pulseStopWatch.reset();
+            _animatingPulse = true;
+        }
+
+        if (_pulseStopWatch.elapsedTime() > 5 && _animatingPulse)
+        {
+           /*if (_toPulse > _fromPulse)
+            {
+                _animPulse++;
+            }*/
+
+            if (_toPulse < _fromPulse && decreasePulseFactor % 5 == 0)
+            {
+                _animPulse--;
+                decreasePulseFactor = 0;
+            }
+            decreasePulseFactor++;
+
+            //_debug.print("_lastPulse: ", String(_lastPulse));
+            //_debug.print("_pulse: ", String(_pulse));
+            //_debug.print("_fromPulse: ", String(_fromPulse));
+            //_debug.print(" _toPulse: ", String(_toPulse));
+            //_debug.println(" _animPulse: ", String(_animPulse));
+
+            if (_animPulse == _toPulse)
+            {
+                _animatingPulse = false;
+            }
+
+            _pulseStopWatch.reset();
+        }
+
+        if (_animatingPulse)
+        {
+            _pulse = _animPulse;
+        }
+    }
+
+    void updateMaxPulse(unsigned int pulse)
+    {
+        if (_maxPulseStopWatch.elapsedTime() > _maxPulseDecreaseTime && _maxPulse > 1)
+        {
+            _maxPulseDecreaseTime *= 0.75;
+            _maxPulse--;
+            //_debug.println("lastMaxPulse: ", String(_maxPulse));
+            _maxPulseStopWatch.reset();
+        }
+
+        if (_maxPulse <= pulse)
+        {
+            setMaxPulse(pulse);
         }
     }
 };

@@ -16,10 +16,6 @@ private:
         return ((uint32_t)r << 16) | ((uint32_t)g << 8) | b;
     }
 
-    /*uint8_t getBits(uint32_t number, uint8_t position, uint8_t count)
-    {
-        return MID(number, position, count);
-    }*/
     uint8_t getR(uint32_t color) { return (uint8_t)(color >> 16); }
     uint8_t getG(uint32_t color) { return (uint8_t)(color >> 8); }
     uint8_t getB(uint32_t color) { return (uint8_t)color; }
@@ -101,6 +97,23 @@ public:
 
         return palette[led];
     }
+
+    uint32_t getPaletteLed2(uint8_t leds, int led)
+    {
+        uint32_t palette[leds];
+        palette[0] = fadeColor(red, purple, 0);
+        palette[1] = fadeColor(red, purple, 15);
+        palette[2] = fadeColor(red, purple, 66);
+        palette[3] = fadeColor(red, purple, 75);
+        palette[4] = fadeColor(purple, blue, 50);
+        palette[5] = fadeColor(purple, blue, 100);
+        palette[6] = fadeColor(blue, green, 50);
+        palette[7] = fadeColor(blue, green, 75);
+        palette[8] = fadeColor(blue, green, 100);
+        palette[9] = fadeColor(blue, green, 100);
+
+        return palette[led];
+    }    
 };
 
 #endif
