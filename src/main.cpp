@@ -43,9 +43,14 @@ void digitalReading()
       sound = sound * 3;
     }
 
-    debug.println("sound: ", String(sound));
+    //debug.println("sound: ", String(sound));
     pulse = map(sound, 0, 400, 0, 100);
     ledLamp.setPulse(pulse);
+
+    if (tempStopWatch1.elapsedTime() > 5000)
+    {
+      ledLamp.beginCarrousel();
+    }
 
     ledStopWatch.reset();
   }
@@ -68,6 +73,15 @@ void hundredToZeroTesting()
   {
     pulse = 0;
     tempStopWatch1.reset();
+  }
+}
+
+void transitionTesting()
+{
+  if (ledStopWatch.elapsedTime() > 5)
+  {
+    ledLamp.setPulse(100);
+    ledStopWatch.reset();
   }
 }
 
@@ -112,4 +126,5 @@ void analogReading()
 void loop()
 {
   digitalReading();
+  //transitionTesting();
 }

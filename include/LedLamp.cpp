@@ -15,6 +15,7 @@ private:
     PaletteProvider _paletteProvider;
     StopWatch _pulseStopWatch;
     StopWatch _maxPulseStopWatch;
+    uint32_t _currentPalette[10];
 
     const unsigned long MAX_PULSE_DECREASE_TIME = 250;
 
@@ -23,6 +24,7 @@ private:
     unsigned int _maxPulse = 0;
     unsigned int _lastPulse = 0;
     bool _animatingPulse = false;
+    unsigned int _decreasePulseFactor = 0;
     unsigned int _animPulse = 0;
     unsigned int _fromPulse = 0;
     unsigned int _toPulse = 0;
@@ -31,8 +33,7 @@ private:
 
     uint32_t getColor(int led)
     {
-        //uint32_t *redPalette = _paletteProvider.getPalette(_leds);
-        uint32_t color = _paletteProvider.getPaletteLed(_leds, led);
+        uint32_t color = _currentPalette[led];
 
         return color;
     }
@@ -41,47 +42,6 @@ private:
     {
         _maxPulse = maxPulse;
         _maxPulseDecreaseTime = MAX_PULSE_DECREASE_TIME;
-    }
-
-public:
-    LedLamp(unsigned int leds) : _debug("LedLamp"), _strip(leds, 3, NEO_GRB + NEO_KHZ800), _paletteProvider(_leds), _pulseStopWatch(), _maxPulseStopWatch()
-    {
-        _leds = leds;
-    };
-
-    void begin()
-    {
-        _strip.begin();
-        _strip.show();
-    }
-
-    void setBrightness(unsigned int brightness)
-    {
-        _strip.setBrightness(brightness);
-    }
-
-    void setPulse(unsigned int percentage)
-    {
-        if (percentage > 100)
-        {
-            percentage = 100;
-        }
-
-        if (!_animatingPulse)
-        {
-            _pulse = _leds * percentage / 100;
-            //_debug.println("_pulse: ", String(_pulse));
-        }
-
-        updatePulse();
-        updateMaxPulse(_pulse);
-
-        _strip.clear();
-        renderPulse(_pulse);
-        renderMaxPulse(_maxPulse);
-        _strip.show();
-
-        _lastPulse = _pulse;
     }
 
     void renderPulse(unsigned int pulse)
@@ -97,7 +57,6 @@ public:
         _strip.setPixelColor(maxPulse - 1, _strip.Color(255, 255, 255));
     }
 
-    unsigned int decreasePulseFactor = 0;
     void updatePulse()
     {
         if (!_animatingPulse && _pulse < _lastPulse)
@@ -111,17 +70,17 @@ public:
 
         if (_pulseStopWatch.elapsedTime() > 5 && _animatingPulse)
         {
-           /*if (_toPulse > _fromPulse)
+            /*if (_toPulse > _fromPulse)
             {
                 _animPulse++;
             }*/
 
-            if (_toPulse < _fromPulse && decreasePulseFactor % 5 == 0)
+            if (_toPulse < _fromPulse && _decreasePulseFactor % 5 == 0)
             {
                 _animPulse--;
-                decreasePulseFactor = 0;
+                _decreasePulseFactor = 0;
             }
-            decreasePulseFactor++;
+            _decreasePulseFactor++;
 
             //_debug.print("_lastPulse: ", String(_lastPulse));
             //_debug.print("_pulse: ", String(_pulse));
@@ -157,6 +116,88 @@ public:
         {
             setMaxPulse(pulse);
         }
+    }
+
+public:
+    LedLamp(unsigned int leds) : _debug("LedLamp"), _strip(leds, 3, NEO_GRB + NEO_KHZ800), _paletteProvider(leds), _pulseStopWatch(), _maxPulseStopWatch()
+    {
+        initCarrouselColors();
+        _leds = leds;
+        PaletteProvider::assignPalette(_paletteProvider.getPaletteBlueRed(), _currentPalette, _leds);
+    };
+
+    void begin()
+    {
+        _strip.begin();
+        _strip.show();
+    }
+
+    PaletteProvider &getPaletteProvider()
+    {
+        return _paletteProvider;
+    }
+
+    uint32_t *carrouselColors[2];
+    void initCarrouselColors()
+    {
+        carrouselColors[0] = _paletteProvider.getPaletteRedGreen();
+        carrouselColors[1] = _paletteProvider.getPaletteBlueRed();
+    }
+
+    unsigned int carrouselCount = -1;
+    void beginCarrousel()
+    {
+        if (!_paletteProvider.isInPaletteTransition())
+        {
+            _paletteProvider.beginTransition();
+            carrouselCount++;
+            if (carrouselCount > 1)
+            {
+                carrouselCount = 0;
+            }
+        }
+        setPalette(carrouselColors[carrouselCount]);
+    }
+
+    void setBrightness(unsigned int brightness)
+    {
+        _strip.setBrightness(brightness);
+    }
+
+    void setPulse(unsigned int percentage)
+    {
+        if (percentage > 100)
+        {
+            percentage = 100;
+        }
+
+        if (!_animatingPulse)
+        {
+            _pulse = _leds * percentage / 100;
+            //_debug.println("_pulse: ", String(_pulse));
+        }
+
+        updatePulse();
+        updateMaxPulse(_pulse);
+
+        _strip.clear();
+        renderPulse(_pulse);
+        renderMaxPulse(_maxPulse);
+        _strip.show();
+
+        _lastPulse = _pulse;
+    }
+
+    uint32_t fromTransitionPalette[10];
+    void setPalette(uint32_t *palette)
+    {
+        if (!_paletteProvider.isInPaletteTransition())
+        {
+            PaletteProvider::assignPalette(_currentPalette, fromTransitionPalette, _leds);
+        }
+        uint32_t *transitioningPalette = _paletteProvider.setPaletteTransitioned(fromTransitionPalette, palette);
+
+        PaletteProvider::assignPalette(transitioningPalette, _currentPalette, _leds);
     }
 };
 
